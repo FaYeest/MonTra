@@ -63,7 +63,7 @@ abstract final class MontraTheme {
         centerTitle: false,
         titleTextStyle: textTheme.titleLarge,
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: tokens.surface,
         elevation: 0,
         margin: EdgeInsets.zero,
