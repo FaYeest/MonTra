@@ -1,0 +1,29 @@
+{
+	auto_https off
+	admin off
+}
+
+:80 {
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	# Route only public health and /api/v1 endpoints to the Go backend.
+	# The Python ML service (/internal/v1/*) is strictly isolated on internal_ml_net.
+	handle /healthz {
+		reverse_proxy api:8080
+	}
+
+	handle /api/v1/* {
+		reverse_proxy api:8080
+	}
+
+	handle {
+		respond "{\"error\":{\"code\":\"NOT_FOUND\",\"message\":\"Endpoint tidak ditemukan.\"}}" 404 {
+			close
+		}
+	}
+}

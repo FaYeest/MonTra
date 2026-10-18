@@ -1,0 +1,302 @@
+openapi: 3.1.0
+info:
+  title: MonTra API Specification
+  version: 0.1.0
+  summary: Public REST API (Golang) and Internal AI/ML Service Contracts (Python FastAPI)
+  description: |
+    Initial OpenAPI specification for **MonTra** (Money Tracker).
+
+    ### Architecture Boundaries
+    - **Public API (`/api/v1/*`, `/healthz`)**: Served exclusively by the Golang backend (`services/api`). Owns authentication, authorization, accounts, transactions, internal transfers, categories, budgets, and financial reports.
+    - **Internal ML API (`/internal/v1/*`)**: Served by the Python FastAPI service (`services/ml`) on the internal Docker network only. Never exposed to public clients.
+    - **Monetary Amounts**: Represented as 64-bit integers (`int64`) in minor/base currency units (whole Rupiah for `IDR`) alongside an explicit ISO 4217 currency code.
+
+servers:
+  - url: http://localhost:8080
+    description: Local Go API Server (Direct)
+  - url: http://localhost:8088
+    description: Local Caddy Reverse Proxy
+
+tags:
+  - name: System
+    description: Service health and readiness checks
+  - name: InternalML
+    description: Internal-only endpoints between Go (`services/api`) and Python (`services/ml`)
+
+paths:
+  /healthz:
+    get:
+      operationId: getLiveness
+      tags:
+        - System
+      summary: Liveness check for the Go API server
+      responses:
+        "200":
+          description: Go API process is alive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicHealthResponse"
+
+  /api/v1/health:
+    get:
+      operationId: getApiHealth
+      tags:
+        - System
+      summary: Detailed health and dependency status for MonTra API
+      description: |
+        Returns the operational state of the authoritative Go API, PostgreSQL connectivity, and assistive ML service reachability.
+        Note that `degraded` ML status does **not** make the core financial API unhealthy (`core_ready` remains `true` as long as core dependencies are healthy).
+      responses:
+        "200":
+          description: Core API is operational
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicHealthResponse"
+        "503":
+          description: Core API dependency (PostgreSQL) is unavailable when required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicHealthResponse"
+
+  /internal/v1/health:
+    get:
+      operationId: getInternalMlHealth
+      tags:
+        - InternalML
+      summary: Internal health and model readiness check (Python FastAPI)
+      description: |
+        Internal endpoint called only by `services/api` (`mlclient`) or container healthchecks.
+        Reports service liveness and whether evaluated model artifacts are loaded.
+      responses:
+        "200":
+          description: Python ML service is reachable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalMLHealthResponse"
+
+  /internal/v1/predict/category:
+    post:
+      operationId: predictTransactionCategory
+      tags:
+        - InternalML
+      summary: Predict transaction category from normalized transaction features (Internal)
+      description: |
+        Called by `services/api` with a strict timeout.
+        During Phase 0 (before a trained model artifact is evaluated and loaded), returns HTTP 503 with error code `MODEL_NOT_READY` rather than fabricating predictions.
+      parameters:
+        - in: header
+          name: X-Internal-Service-Token
+          required: false
+          schema:
+            type: string
+          description: Shared internal service authentication token when configured
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryPredictionRequest"
+      responses:
+        "200":
+          description: Evaluated model prediction returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryPredictionResponse"
+        "401":
+          description: Missing or invalid internal service token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Invalid request payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Model artifact is not loaded or not yet evaluated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    PublicHealthResponse:
+      type: object
+      required:
+        - status
+        - service
+        - environment
+        - core_ready
+        - timestamp
+        - components
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded, unavailable]
+        service:
+          type: string
+          example: montra-api
+        environment:
+          type: string
+          example: development
+        core_ready:
+          type: boolean
+          description: True when core financial operations are available (independent of ML availability)
+        timestamp:
+          type: string
+          format: date-time
+        components:
+          type: object
+          required:
+            - database
+            - ml_service
+          properties:
+            database:
+              $ref: "#/components/schemas/ComponentHealth"
+            ml_service:
+              $ref: "#/components/schemas/ComponentHealth"
+
+    ComponentHealth:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded, unavailable, disabled, unconfigured]
+        message:
+          type: string
+        model_version:
+          type: string
+
+    InternalMLHealthResponse:
+      type: object
+      required:
+        - status
+        - service
+        - environment
+        - model_ready
+        - active_models
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+        service:
+          type: string
+          example: montra-ml
+        environment:
+          type: string
+          example: development
+        model_ready:
+          type: boolean
+          description: True only when evaluated model artifacts are present and verified
+        active_models:
+          type: object
+          required:
+            - category_classifier
+            - anomaly_detector
+            - expense_forecaster
+          properties:
+            category_classifier:
+              $ref: "#/components/schemas/ModelArtifactStatus"
+            anomaly_detector:
+              $ref: "#/components/schemas/ModelArtifactStatus"
+            expense_forecaster:
+              $ref: "#/components/schemas/ModelArtifactStatus"
+        timestamp:
+          type: string
+          format: date-time
+
+    ModelArtifactStatus:
+      type: object
+      required:
+        - loaded
+        - model_version
+        - status
+      properties:
+        loaded:
+          type: boolean
+        model_version:
+          type: string
+          example: untrained-v0
+        status:
+          type: string
+          enum: [ready, model_not_loaded]
+
+    CategoryPredictionRequest:
+      type: object
+      required:
+        - description
+        - transaction_type
+        - currency
+        - amount
+      properties:
+        description:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: Kopi Kenangan
+        transaction_type:
+          type: string
+          enum: [income, expense]
+          example: expense
+        currency:
+          type: string
+          pattern: "^[A-Z]{3}$"
+          example: IDR
+        amount:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Positive monetary amount in whole currency units (e.g., IDR)
+          example: 25000
+
+    CategoryPredictionResponse:
+      type: object
+      required:
+        - predicted_category
+        - confidence
+        - model_version
+      properties:
+        predicted_category:
+          type: string
+          example: food_and_drink
+        confidence:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          example: 0.91
+        model_version:
+          type: string
+          example: category-v1
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              example: MODEL_NOT_READY
+            message:
+              type: string
+              example: Model kategorisasi belum dimuat atau belum melalui evaluasi.
+            details:
+              type: object
+              additionalProperties: true
