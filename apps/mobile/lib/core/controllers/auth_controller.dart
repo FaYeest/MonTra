@@ -48,9 +48,15 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final res = await _apiClient.get('/auth/me');
+      dynamic res;
+      try {
+        res = await _apiClient.get('/auth/me');
+      } catch (_) {
+        res = await _apiClient.get('/me');
+      }
       if (res is Map<String, dynamic>) {
-        _currentUser = UserModel.fromJson(res);
+        final userMap = res.containsKey('user') ? res['user'] : res;
+        _currentUser = UserModel.fromJson(userMap as Map<String, dynamic>);
         await _tokenStorage.saveUser(_currentUser!);
         _status = AuthStatus.authenticated;
       } else {
@@ -92,7 +98,7 @@ class AuthController extends ChangeNotifier {
       );
 
       if (res is Map<String, dynamic>) {
-        final token = res['access_token'] as String?;
+        final token = (res['token'] ?? res['access_token']) as String?;
         final userMap = res['user'] as Map<String, dynamic>?;
 
         if (token != null && token.isNotEmpty) {
@@ -140,6 +146,7 @@ class AuthController extends ChangeNotifier {
       final res = await _apiClient.post(
         '/auth/register',
         body: <String, dynamic>{
+          'display_name': fullName.trim(),
           'full_name': fullName.trim(),
           'email': email.trim(),
           'password': password,
@@ -147,7 +154,7 @@ class AuthController extends ChangeNotifier {
       );
 
       if (res is Map<String, dynamic>) {
-        final token = res['access_token'] as String?;
+        final token = (res['token'] ?? res['access_token']) as String?;
         final userMap = res['user'] as Map<String, dynamic>?;
 
         if (token != null && token.isNotEmpty) {

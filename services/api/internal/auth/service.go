@@ -23,6 +23,7 @@ type RegisterRequest struct {
 	Email             string `json:"email"`
 	Password          string `json:"password"`
 	DisplayName       string `json:"display_name"`
+	FullName          string `json:"full_name,omitempty"`
 	PreferredCurrency string `json:"preferred_currency,omitempty"`
 }
 
@@ -34,8 +35,9 @@ type LoginRequest struct {
 
 // AuthResponse returns the JWT bearer token and public user profile.
 type AuthResponse struct {
-	Token string           `json:"token"`
-	User  users.ProfileDTO `json:"user"`
+	Token       string           `json:"token"`
+	AccessToken string           `json:"access_token,omitempty"`
+	User        users.ProfileDTO `json:"user"`
 }
 
 // Service provides authentication and profile query logic.
@@ -65,6 +67,9 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*AuthRespo
 	}
 
 	displayName := strings.TrimSpace(req.DisplayName)
+	if displayName == "" && req.FullName != "" {
+		displayName = strings.TrimSpace(req.FullName)
+	}
 	if len(displayName) < 1 || len(displayName) > 60 {
 		return nil, ErrInvalidDisplayName
 	}
@@ -100,8 +105,9 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*AuthRespo
 	}
 
 	return &AuthResponse{
-		Token: token,
-		User:  u.ToDTO(),
+		Token:       token,
+		AccessToken: token,
+		User:        u.ToDTO(),
 	}, nil
 }
 
@@ -130,8 +136,9 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*AuthResponse, e
 	}
 
 	return &AuthResponse{
-		Token: token,
-		User:  u.ToDTO(),
+		Token:       token,
+		AccessToken: token,
+		User:        u.ToDTO(),
 	}, nil
 }
 

@@ -16,7 +16,7 @@ class UserModel {
     return UserModel(
       id: json['id'] as String? ?? '',
       email: json['email'] as String? ?? '',
-      fullName: json['full_name'] as String? ?? '',
+      fullName: (json['display_name'] ?? json['full_name']) as String? ?? '',
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'] as String)
           : null,

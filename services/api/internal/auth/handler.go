@@ -30,6 +30,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	// Protected routes wrapped with RequireAuth
 	authMiddleware := RequireAuth(h.tm)
 	mux.Handle("GET /api/v1/me", authMiddleware(http.HandlerFunc(h.HandleMe)))
+	mux.Handle("GET /api/v1/auth/me", authMiddleware(http.HandlerFunc(h.HandleMe)))
 }
 
 // HandleRegister handles user registration.
