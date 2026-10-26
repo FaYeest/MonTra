@@ -36,6 +36,9 @@ class MontraColorTokens extends ThemeExtension<MontraColorTokens> {
   final Color expenseContainer;
   final Color warning;
 
+  /// Semantic alias for positive income indicators (emerald/forest primary).
+  Color get income => primary;
+
   /// Light palette (`docs/design.md` Section 5.1).
   static const MontraColorTokens light = MontraColorTokens(
     canvas: Color(0xFFF4F3ED),

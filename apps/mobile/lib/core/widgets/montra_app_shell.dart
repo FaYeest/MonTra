@@ -8,6 +8,7 @@ import '../../features/budgets/budgets_screen.dart';
 import '../../features/home/home_screen.dart';
 import '../../features/insights/insights_screen.dart';
 import '../../features/profile/profile_screen.dart';
+import '../../features/transactions/add_transaction_sheet.dart';
 import '../../features/transactions/transactions_screen.dart';
 
 /// Persistent 5-destination shell defined in `docs/design.md` Section 4.1 & 7.1:
@@ -36,44 +37,7 @@ class _MontraAppShellState extends State<MontraAppShell> {
   bool _concealBalances = false;
 
   void _openAddTransactionSheet(BuildContext context) {
-    final tokens = Theme.of(context).extension<MontraColorTokens>()!;
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (sheetContext) {
-        return Padding(
-          padding: const EdgeInsets.all(MontraSpacing.xl),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                'Catat transaksi',
-                style: Theme.of(sheetContext).textTheme.titleLarge,
-              ),
-              const SizedBox(height: MontraSpacing.xs),
-              Text(
-                'Formulir pencatatan pemasukan, pengeluaran, dan transfer antar-akun '
-                'akan dihubungkan ke API Go pada Fase 1.',
-                style: Theme.of(sheetContext).textTheme.bodyMedium?.copyWith(
-                      color: tokens.textSecondary,
-                    ),
-              ),
-              const SizedBox(height: MontraSpacing.lg),
-              SizedBox(
-                width: double.infinity,
-                height: MontraSpacing.minTouchTarget,
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(sheetContext).pop(),
-                  child: const Text('Tutup'),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+    AddTransactionSheet.show(context);
   }
 
   void _openProfileScreen(BuildContext context) {
@@ -136,6 +100,11 @@ class _MontraAppShellState extends State<MontraAppShell> {
                 });
               },
               onRequestAddTransaction: () => _openAddTransactionSheet(context),
+              onViewAllTransactions: () {
+                setState(() {
+                  _selectedTab = MontraPrimaryTab.transaksi;
+                });
+              },
             ),
             TransactionsScreen(
               onRequestAddTransaction: () => _openAddTransactionSheet(context),
