@@ -3,6 +3,7 @@ package transactions
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -120,11 +121,13 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrInvalidAmount), errors.Is(err, ErrInvalidType),
-			errors.Is(err, ErrInvalidDescription), errors.Is(err, ErrCategoryNotValid):
+			errors.Is(err, ErrInvalidDescription), errors.Is(err, ErrCategoryNotValid),
+			errors.Is(err, ErrInvalidDate):
 			writeJSONError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", err.Error())
 		case errors.Is(err, ErrAccountNotFound):
 			writeJSONError(w, http.StatusNotFound, "ACCOUNT_NOT_FOUND", err.Error())
 		default:
+			slog.Error("failed to create transaction", "user_id", userID, "error", err)
 			writeJSONError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal mencatat transaksi.")
 		}
 		return
@@ -190,11 +193,13 @@ func (h *Handler) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, ErrTransactionNotFound):
 			writeJSONError(w, http.StatusNotFound, "NOT_FOUND", "Transaksi tidak ditemukan.")
 		case errors.Is(err, ErrInvalidAmount), errors.Is(err, ErrInvalidType),
-			errors.Is(err, ErrInvalidDescription), errors.Is(err, ErrCategoryNotValid):
+			errors.Is(err, ErrInvalidDescription), errors.Is(err, ErrCategoryNotValid),
+			errors.Is(err, ErrInvalidDate):
 			writeJSONError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", err.Error())
 		case errors.Is(err, ErrAccountNotFound):
 			writeJSONError(w, http.StatusNotFound, "ACCOUNT_NOT_FOUND", err.Error())
 		default:
+			slog.Error("failed to update transaction", "user_id", userID, "error", err)
 			writeJSONError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal memperbarui transaksi.")
 		}
 		return

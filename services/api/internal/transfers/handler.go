@@ -3,6 +3,7 @@ package transfers
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -87,11 +88,13 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	item, err := h.service.CreateTransfer(r.Context(), userID, req)
 	if err != nil {
 		switch {
-		case errors.Is(err, ErrSameAccountTransfer), errors.Is(err, ErrInvalidAmount), errors.Is(err, ErrInvalidFee):
+		case errors.Is(err, ErrSameAccountTransfer), errors.Is(err, ErrInvalidAmount),
+			errors.Is(err, ErrInvalidFee), errors.Is(err, ErrInvalidDate):
 			writeJSONError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", err.Error())
 		case errors.Is(err, ErrAccountNotFound):
 			writeJSONError(w, http.StatusNotFound, "ACCOUNT_NOT_FOUND", err.Error())
 		default:
+			slog.Error("failed to create transfer", "user_id", userID, "error", err)
 			writeJSONError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Gagal mencatat transfer.")
 		}
 		return

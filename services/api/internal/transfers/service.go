@@ -58,16 +58,9 @@ func (s *Service) CreateTransfer(ctx context.Context, userID string, req CreateT
 		return nil, ErrInvalidFee
 	}
 
-	txDate := time.Now().UTC()
-	if strings.TrimSpace(req.TransactionDate) != "" {
-		parsedDate, err := time.Parse(time.RFC3339, strings.TrimSpace(req.TransactionDate))
-		if err != nil {
-			parsedDate, err = time.Parse("2006-01-02", strings.TrimSpace(req.TransactionDate))
-			if err != nil {
-				return nil, err
-			}
-		}
-		txDate = parsedDate.UTC()
+	txDate, err := parseTransferDate(req.TransactionDate)
+	if err != nil {
+		return nil, err
 	}
 
 	currency := strings.ToUpper(strings.TrimSpace(req.Currency))
@@ -113,4 +106,27 @@ func (s *Service) ListTransfers(ctx context.Context, userID string, limit, offse
 // DeleteTransfer deletes a transfer record.
 func (s *Service) DeleteTransfer(ctx context.Context, userID, transferID string) error {
 	return s.repo.Delete(ctx, userID, transferID)
+}
+
+func parseTransferDate(raw string) (time.Time, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return time.Now().UTC(), nil
+	}
+	formats := []string{
+		time.RFC3339Nano,
+		time.RFC3339,
+		"2006-01-02T15:04:05.999999999",
+		"2006-01-02T15:04:05.999999",
+		"2006-01-02T15:04:05.999",
+		"2006-01-02T15:04:05",
+		"2006-01-02 15:04:05",
+		"2006-01-02",
+	}
+	for _, f := range formats {
+		if t, err := time.Parse(f, raw); err == nil {
+			return t.UTC(), nil
+		}
+	}
+	return time.Time{}, ErrInvalidDate
 }

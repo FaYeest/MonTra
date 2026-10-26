@@ -16,6 +16,8 @@ var (
 	ErrInvalidFee = errors.New("biaya transfer tidak boleh negatif")
 	// ErrAccountNotFound indicates source or destination account is invalid or not owned by user.
 	ErrAccountNotFound = errors.New("akun sumber atau tujuan tidak ditemukan atau bukan milik pengguna")
+	// ErrInvalidDate indicates transfer_date format cannot be parsed.
+	ErrInvalidDate = errors.New("format tanggal transfer tidak valid")
 )
 
 // Transfer represents an internal fund movement between two accounts owned by the same user.

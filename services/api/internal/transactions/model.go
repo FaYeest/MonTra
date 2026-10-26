@@ -18,6 +18,8 @@ var (
 	ErrAccountNotFound = errors.New("akun tidak ditemukan atau bukan milik pengguna")
 	// ErrCategoryNotValid indicates category is inaccessible or type does not match.
 	ErrCategoryNotValid = errors.New("kategori tidak valid untuk tipe transaksi ini")
+	// ErrInvalidDate indicates transaction_date format cannot be parsed.
+	ErrInvalidDate = errors.New("format tanggal transaksi tidak valid")
 )
 
 // Transaction represents an income or expense record.

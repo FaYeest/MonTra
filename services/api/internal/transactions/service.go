@@ -89,17 +89,9 @@ func (s *Service) CreateTransaction(ctx context.Context, userID string, req Crea
 	}
 
 	// 7. Date parsing
-	txDate := time.Now().UTC()
-	if strings.TrimSpace(req.TransactionDate) != "" {
-		parsedDate, err := time.Parse(time.RFC3339, strings.TrimSpace(req.TransactionDate))
-		if err != nil {
-			// fallback YYYY-MM-DD
-			parsedDate, err = time.Parse("2006-01-02", strings.TrimSpace(req.TransactionDate))
-			if err != nil {
-				return nil, err
-			}
-		}
-		txDate = parsedDate.UTC()
+	txDate, err := parseTransactionDate(req.TransactionDate)
+	if err != nil {
+		return nil, err
 	}
 
 	currency := strings.ToUpper(strings.TrimSpace(req.Currency))
@@ -186,12 +178,9 @@ func (s *Service) UpdateTransaction(ctx context.Context, userID, transactionID s
 		categoryID = &catID
 	}
 
-	parsedDate, err := time.Parse(time.RFC3339, strings.TrimSpace(req.TransactionDate))
+	parsedDate, err := parseTransactionDate(req.TransactionDate)
 	if err != nil {
-		parsedDate, err = time.Parse("2006-01-02", strings.TrimSpace(req.TransactionDate))
-		if err != nil {
-			return nil, err
-		}
+		return nil, err
 	}
 
 	catSource := strings.ToLower(strings.TrimSpace(req.CategorySource))
@@ -205,7 +194,7 @@ func (s *Service) UpdateTransaction(ctx context.Context, userID, transactionID s
 		Type:            txType,
 		Amount:          req.Amount,
 		Description:     desc,
-		TransactionDate: parsedDate.UTC(),
+		TransactionDate: parsedDate,
 		Notes:           req.Notes,
 		CategorySource:  catSource,
 	}
@@ -220,4 +209,27 @@ func (s *Service) UpdateTransaction(ctx context.Context, userID, transactionID s
 // DeleteTransaction removes a transaction.
 func (s *Service) DeleteTransaction(ctx context.Context, userID, transactionID string) error {
 	return s.repo.Delete(ctx, userID, transactionID)
+}
+
+func parseTransactionDate(raw string) (time.Time, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return time.Now().UTC(), nil
+	}
+	formats := []string{
+		time.RFC3339Nano,
+		time.RFC3339,
+		"2006-01-02T15:04:05.999999999",
+		"2006-01-02T15:04:05.999999",
+		"2006-01-02T15:04:05.999",
+		"2006-01-02T15:04:05",
+		"2006-01-02 15:04:05",
+		"2006-01-02",
+	}
+	for _, f := range formats {
+		if t, err := time.Parse(f, raw); err == nil {
+			return t.UTC(), nil
+		}
+	}
+	return time.Time{}, ErrInvalidDate
 }

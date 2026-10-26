@@ -198,7 +198,7 @@ class LedgerController extends ChangeNotifier {
           'amount': amount,
           'currency': 'IDR',
           'description': description.trim(),
-          'transaction_date': date.toIso8601String(),
+          'transaction_date': date.toUtc().toIso8601String(),
           if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
         },
       );
@@ -246,7 +246,7 @@ class LedgerController extends ChangeNotifier {
           'amount': amount,
           'fee_amount': feeAmount,
           'currency': 'IDR',
-          'transfer_date': date.toIso8601String(),
+          'transfer_date': date.toUtc().toIso8601String(),
           if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
         },
       );
