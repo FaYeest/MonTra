@@ -87,6 +87,10 @@ class LedgerController extends ChangeNotifier {
       _categories = results[1] as List<CategoryModel>;
       _transactions = results[2] as List<TransactionModel>;
       _transfers = results[3] as List<TransferModel>;
+
+      if (_accounts.isEmpty) {
+        await ensureDefaultAccount();
+      }
       _errorMessage = null;
     } on ApiException catch (e) {
       _errorMessage = e.message;
@@ -96,6 +100,38 @@ class LedgerController extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  /// Ensure at least one default account exists. If user has no accounts,
+  /// creates a default "Kas Utama" account via the API.
+  Future<AccountModel?> ensureDefaultAccount() async {
+    if (_accounts.isNotEmpty) {
+      return _accounts.first;
+    }
+    try {
+      final res = await _apiClient.post(
+        '/accounts',
+        body: <String, dynamic>{
+          'name': 'Kas Utama',
+          'account_type': 'cash',
+          'opening_balance': 0,
+          'currency': 'IDR',
+        },
+      );
+      if (res is Map<String, dynamic>) {
+        final newAcc = AccountModel.fromJson(res);
+        _accounts = <AccountModel>[newAcc];
+        notifyListeners();
+        return newAcc;
+      }
+    } on ApiException catch (e) {
+      _errorMessage = e.message;
+      notifyListeners();
+    } catch (e) {
+      _errorMessage = 'Gagal membuat akun kas default: ${e.toString()}';
+      notifyListeners();
+    }
+    return null;
   }
 
   Future<List<AccountModel>> _fetchAccounts() async {

@@ -54,8 +54,12 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
     });
   }
 
-  void _initSelections() {
+  Future<void> _initSelections() async {
     final ledger = MontraScope.ledgerOf(context);
+    if (ledger.accounts.isEmpty) {
+      await ledger.ensureDefaultAccount();
+    }
+    if (!mounted) return;
     final accounts = ledger.accounts;
     if (accounts.isNotEmpty) {
       setState(() {
@@ -128,75 +132,101 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
       _errorMessage = null;
     });
 
-    bool success = false;
-    if (_formType == TransactionFormType.transfer) {
-      if (_selectedAccountId == _selectedDestinationAccountId) {
-        setState(() {
-          _errorMessage = 'Akun sumber dan akun tujuan tidak boleh sama.';
-          _isSubmitting = false;
-        });
-        return;
+    try {
+      if (_selectedAccountId == null) {
+        if (ledger.accounts.isEmpty) {
+          await ledger.ensureDefaultAccount();
+        }
+        if (ledger.accounts.isNotEmpty) {
+          _selectedAccountId = ledger.accounts.first.id;
+        } else {
+          setState(() {
+            _errorMessage = 'Akun / dompet belum tersedia. Muat ulang halaman.';
+          });
+          return;
+        }
       }
 
-      final feeAmount = int.tryParse(
-            _feeController.text.replaceAll(RegExp(r'[^0-9]'), ''),
-          ) ??
-          0;
+      bool success = false;
+      if (_formType == TransactionFormType.transfer) {
+        if (_selectedDestinationAccountId == null ||
+            _selectedAccountId == _selectedDestinationAccountId) {
+          setState(() {
+            _errorMessage = 'Pilih akun tujuan yang berbeda dari akun sumber.';
+          });
+          return;
+        }
 
-      success = await ledger.createTransfer(
-        sourceAccountId: _selectedAccountId!,
-        destinationAccountId: _selectedDestinationAccountId!,
-        amount: rawAmount,
-        feeAmount: feeAmount,
-        transferDate: _selectedDate,
-        notes: _notesController.text.trim().isNotEmpty
-            ? _notesController.text.trim()
-            : null,
-      );
-    } else {
-      if (_selectedCategoryId == null) {
-        setState(() {
-          _errorMessage = 'Silakan pilih kategori transaksi.';
-          _isSubmitting = false;
-        });
-        return;
+        final feeAmount = int.tryParse(
+              _feeController.text.replaceAll(RegExp(r'[^0-9]'), ''),
+            ) ??
+            0;
+
+        success = await ledger.createTransfer(
+          sourceAccountId: _selectedAccountId!,
+          destinationAccountId: _selectedDestinationAccountId!,
+          amount: rawAmount,
+          feeAmount: feeAmount,
+          transferDate: _selectedDate,
+          notes: _notesController.text.trim().isNotEmpty
+              ? _notesController.text.trim()
+              : null,
+        );
+      } else {
+        if (_selectedCategoryId == null) {
+          setState(() {
+            _errorMessage = 'Silakan pilih kategori transaksi.';
+          });
+          return;
+        }
+
+        final typeStr =
+            _formType == TransactionFormType.income ? 'income' : 'expense';
+
+        success = await ledger.createTransaction(
+          accountId: _selectedAccountId!,
+          categoryId: _selectedCategoryId!,
+          type: typeStr,
+          amount: rawAmount,
+          description: _descriptionController.text.trim(),
+          transactionDate: _selectedDate,
+          notes: _notesController.text.trim().isNotEmpty
+              ? _notesController.text.trim()
+              : null,
+        );
       }
 
-      final typeStr =
-          _formType == TransactionFormType.income ? 'income' : 'expense';
+      if (!mounted) return;
 
-      success = await ledger.createTransaction(
-        accountId: _selectedAccountId!,
-        categoryId: _selectedCategoryId!,
-        type: typeStr,
-        amount: rawAmount,
-        description: _descriptionController.text.trim(),
-        transactionDate: _selectedDate,
-        notes: _notesController.text.trim().isNotEmpty
-            ? _notesController.text.trim()
-            : null,
-      );
-    }
-
-    if (!mounted) return;
-
-    setState(() {
-      _isSubmitting = false;
-      _errorMessage = ledger.errorMessage;
-    });
-
-    if (success) {
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _formType == TransactionFormType.transfer
-                ? 'Transfer berhasil dicatat'
-                : 'Transaksi berhasil disimpan',
+      if (success) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _formType == TransactionFormType.transfer
+                  ? 'Transfer berhasil dicatat'
+                  : 'Transaksi berhasil disimpan',
+            ),
+            behavior: SnackBarBehavior.floating,
           ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+        );
+      } else {
+        setState(() {
+          _errorMessage = ledger.errorMessage ?? 'Gagal menyimpan transaksi.';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Terjadi kesalahan: ${e.toString()}';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
     }
   }
 
@@ -398,6 +428,28 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
                   },
                   validator: (val) =>
                       val == null ? 'Pilih akun pembayaran' : null,
+                ),
+                const SizedBox(height: MontraSpacing.md),
+              ] else ...[
+                Container(
+                  padding: const EdgeInsets.all(MontraSpacing.sm),
+                  decoration: BoxDecoration(
+                    color: tokens.surfaceSubtle,
+                    borderRadius: BorderRadius.circular(MontraShapes.radiusSm),
+                  ),
+                  child: Row(
+                    children: <Widget>[
+                      Icon(Icons.account_balance_wallet_outlined,
+                          size: 18, color: tokens.primary),
+                      const SizedBox(width: MontraSpacing.xs),
+                      Text(
+                        'Akun: Kas Utama (Otomatis)',
+                        style: textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: MontraSpacing.md),
               ],
