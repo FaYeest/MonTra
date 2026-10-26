@@ -37,6 +37,25 @@ abstract final class IdrFormatter {
     return '${prefix}Rp$grouped';
   }
 
+  /// Formats an amount compactly (e.g. `16rb`, `1,5jt`, `0`) for small chart badges.
+  static String formatCompact(int units, {bool concealed = false}) {
+    if (concealed) {
+      return '••••';
+    }
+    final abs = units.abs();
+    if (abs >= 1000000) {
+      final val = abs / 1000000;
+      final formatted = val.toStringAsFixed(abs % 1000000 == 0 ? 0 : 1);
+      return '${formatted}jt';
+    }
+    if (abs >= 1000) {
+      final val = abs / 1000;
+      final formatted = val.toStringAsFixed(abs % 1000 == 0 ? 0 : 1);
+      return '${formatted}rb';
+    }
+    return abs.toString();
+  }
+
   static String _groupThousands(int nonNegativeValue) {
     final digits = nonNegativeValue.toString();
     if (digits.length <= 3) {

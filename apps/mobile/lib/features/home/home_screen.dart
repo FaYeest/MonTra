@@ -6,6 +6,8 @@ import '../../app/theme/app_spacing.dart';
 import '../../app/theme/app_typography.dart';
 import '../../core/formatting/idr_formatter.dart';
 import '../../core/widgets/montra_scope.dart';
+import 'spending_trend_detail_screen.dart';
+import 'widgets/weekly_expense_chart_card.dart';
 
 /// Home (`Beranda`) screen defined in `docs/design.md` Section 6.1 & 12.
 ///
@@ -135,6 +137,22 @@ class HomeScreen extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: MontraSpacing.lg),
+
+          // 7-Day Expense Trend Chart Card (Interactive)
+          WeeklyExpenseChartCard(
+            transactions: transactions,
+            concealBalances: concealBalances,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => SpendingTrendDetailScreen(
+                    concealBalances: concealBalances,
+                  ),
+                ),
+              );
+            },
           ),
           const SizedBox(height: MontraSpacing.lg),
 
