@@ -2,9 +2,12 @@ package database
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/url"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Status represents the operational health of the PostgreSQL connection.
@@ -50,6 +53,32 @@ func NewProbeWithPinger(required bool, pingFunc func(ctx context.Context) error)
 		timeout:  2 * time.Second,
 		pingFunc: pingFunc,
 	}
+}
+
+// NewPool initializes a pgxpool.Pool with sensible defaults.
+func NewPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
+	if dsn == "" {
+		return nil, errors.New("empty database DSN")
+	}
+	cfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, err
+	}
+	cfg.MaxConns = 25
+	cfg.MinConns = 2
+	cfg.MaxConnLifetime = 1 * time.Hour
+	cfg.MaxConnIdleTime = 30 * time.Minute
+	return pgxpool.NewWithConfig(ctx, cfg)
+}
+
+// NewProbeWithPool creates a database health probe backed by a live pgxpool.Pool.
+func NewProbeWithPool(pool *pgxpool.Pool, required bool) *Probe {
+	return NewProbeWithPinger(required, func(ctx context.Context) error {
+		if pool == nil {
+			return errors.New("database pool is nil")
+		}
+		return pool.Ping(ctx)
+	})
 }
 
 // Required reports whether a live database connection is mandatory in the current runtime mode.

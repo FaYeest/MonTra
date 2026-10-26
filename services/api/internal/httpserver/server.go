@@ -7,9 +7,14 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/montra/montra/services/api/internal/accounts"
+	"github.com/montra/montra/services/api/internal/auth"
+	"github.com/montra/montra/services/api/internal/categories"
 	"github.com/montra/montra/services/api/internal/config"
 	"github.com/montra/montra/services/api/internal/database"
 	"github.com/montra/montra/services/api/internal/mlclient"
+	"github.com/montra/montra/services/api/internal/transactions"
+	"github.com/montra/montra/services/api/internal/transfers"
 )
 
 // MLHealthChecker abstracts the internal ML service health probe.
@@ -48,10 +53,15 @@ type ErrorDetail struct {
 
 // Dependencies bundles runtime collaborators for the HTTP server.
 type Dependencies struct {
-	Config   config.Config
-	Logger   *slog.Logger
-	Database database.HealthChecker
-	MLClient MLHealthChecker
+	Config              config.Config
+	Logger              *slog.Logger
+	Database            database.HealthChecker
+	MLClient            MLHealthChecker
+	AuthHandler         *auth.Handler
+	CategoriesHandler   *categories.Handler
+	AccountsHandler     *accounts.Handler
+	TransactionsHandler *transactions.Handler
+	TransfersHandler    *transfers.Handler
 }
 
 // NewHandler builds the HTTP router and middleware stack for the Go API server.
@@ -64,6 +74,22 @@ func NewHandler(deps Dependencies) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", handleHealth(deps))
 	mux.HandleFunc("GET /api/v1/health", handleHealth(deps))
+
+	if deps.AuthHandler != nil {
+		deps.AuthHandler.RegisterRoutes(mux)
+	}
+	if deps.CategoriesHandler != nil {
+		deps.CategoriesHandler.RegisterRoutes(mux)
+	}
+	if deps.AccountsHandler != nil {
+		deps.AccountsHandler.RegisterRoutes(mux)
+	}
+	if deps.TransactionsHandler != nil {
+		deps.TransactionsHandler.RegisterRoutes(mux)
+	}
+	if deps.TransfersHandler != nil {
+		deps.TransfersHandler.RegisterRoutes(mux)
+	}
 
 	// Fallback handler returning a consistent JSON 404 envelope.
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

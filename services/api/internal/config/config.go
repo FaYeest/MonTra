@@ -22,8 +22,15 @@ type Config struct {
 	DefaultCurrency string
 	DefaultTimezone string
 
+	Auth     AuthConfig
 	Database DatabaseConfig
 	ML       MLConfig
+}
+
+// AuthConfig holds authentication and token issuance parameters.
+type AuthConfig struct {
+	JWTSecret string
+	JWTExpiry time.Duration
 }
 
 // DatabaseConfig holds PostgreSQL connection parameters.
@@ -135,8 +142,18 @@ func Load(lookup func(string) (string, bool)) (Config, error) {
 		}
 	}
 
+	appEnv := getString(lookup, "APP_ENV", "development")
+	jwtSecret := getString(lookup, "JWT_SECRET", "CHANGE_ME_LOCAL_DEV_JWT_SECRET_32_BYTES_MINIMUM")
+	jwtExpiryHours, err := parseInt(lookup, "JWT_EXPIRY_HOURS", 72)
+	if err != nil || jwtExpiryHours <= 0 {
+		return Config{}, errors.New("JWT_EXPIRY_HOURS must be a positive integer")
+	}
+	if (appEnv == "production" || appEnv == "staging") && len(jwtSecret) < 32 {
+		return Config{}, errors.New("JWT_SECRET must be at least 32 characters in production or staging")
+	}
+
 	return Config{
-		AppEnv:          getString(lookup, "APP_ENV", "development"),
+		AppEnv:          appEnv,
 		LogLevel:        strings.ToUpper(getString(lookup, "LOG_LEVEL", "INFO")),
 		Host:            getString(lookup, "API_HOST", "0.0.0.0"),
 		Port:            port,
@@ -145,6 +162,10 @@ func Load(lookup func(string) (string, bool)) (Config, error) {
 		ShutdownTimeout: time.Duration(shutdownTimeoutMs) * time.Millisecond,
 		DefaultCurrency: currency,
 		DefaultTimezone: getString(lookup, "DEFAULT_TIMEZONE", "Asia/Jakarta"),
+		Auth: AuthConfig{
+			JWTSecret: jwtSecret,
+			JWTExpiry: time.Duration(jwtExpiryHours) * time.Hour,
+		},
 		Database: DatabaseConfig{
 			Host:     getString(lookup, "POSTGRES_HOST", ""),
 			Port:     dbPort,
